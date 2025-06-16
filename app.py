@@ -5,19 +5,16 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="지하철 노선별 분석", layout="wide")
 
 # 📦 데이터 불러오기
-@st.cache_data
 def load_data():
     df = pd.read_csv("subway.csv")
-    
-    # 날짜 변환 (오류 무시)
-    df["사용일자"] = pd.to_datetime(df["사용일자"], format="%Y%m%d", errors="coerce")
-    
-    # 날짜 변환 실패한 행 제거
+
+    # 날짜 형식 확인 후 잘못된 형식 제거
+    df["사용일자"] = pd.to_numeric(df["사용일자"], errors="coerce")  # 숫자 아닌 날짜 제거
+    df = df.dropna(subset=["사용일자"])
+    df["사용일자"] = pd.to_datetime(df["사용일자"].astype(int).astype(str), format="%Y%m%d", errors="coerce")
     df = df.dropna(subset=["사용일자"])
 
-    # 월 컬럼 추가
     df["월"] = df["사용일자"].dt.to_period("M")
-    
     return df
 
 df = load_data()
