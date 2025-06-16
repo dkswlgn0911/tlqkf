@@ -1,34 +1,41 @@
-import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 데이터 불러오기
-@st.cache_data
-def load_data():
-    df = pd.read_csv("subway.csv")
-    df = df[["노선명", "승차총승객수", "하차총승객수"]]
-    return df
+# CSV 불러오기
+df = pd.read_csv("subway.csv")
 
-df = load_data()
+# 날짜 형식 변환
+df["사용일자"] = pd.to_datetime(df["사용일자"], format="%Y%m%d")
 
-# 노선별로 그룹화
-line_stats = df.groupby("노선명")[["승차총승객수", "하차총승객수"]].sum().sort_values(by="승차총승객수", ascending=False)
+# '월' 컬럼 생성
+df["월"] = df["사용일자"].dt.to_period("M")
 
-# 제목
-st.title("🚇 지하철 노선별 승하차 분석 대시보드")
-
-# 데이터표
-st.dataframe(line_stats)
+# 📊 월별 × 노선별 총 승하차 인원 집계
+monthly_line_stats = df.groupby(["월", "노선명"])[["승차총승객수", "하차총승객수"]].sum().reset_index()
 
 # 그래프 그리기
-st.subheader("노선별 총 승차 인원")
-fig1, ax1 = plt.subplots()
-line_stats["승차총승객수"].plot(kind="bar", ax=ax1, color="skyblue")
-plt.xticks(rotation=45)
-st.pyplot(fig1)
+pivot_board = monthly_line_stats.pivot(index="월", columns="노선명", values="승차총승객수")
+pivot_alight = monthly_line_stats.pivot(index="월", columns="노선명", values="하차총승객수")
 
-st.subheader("노선별 총 하차 인원")
-fig2, ax2 = plt.subplots()
-line_stats["하차총승객수"].plot(kind="bar", ax=ax2, color="salmon")
-plt.xticks(rotation=45)
-st.pyplot(fig2)
+pivot_board.plot(kind="bar", stacked=True, figsize=(15, 6), title="월별 노선별 승차 인원")
+plt.tight_layout()
+plt.show()
+
+pivot_alight.plot(kind="bar", stacked=True, figsize=(15, 6), title="월별 노선별 하차 인원")
+plt.tight_layout()
+plt.show()
+
+# 🏆 노선별 최고 승/하차 역과 날짜 찾기
+def get_max_stat(df, column):
+    idx = df.groupby("노선명")[column].idxmax()
+    return df.loc[idx, ["노선명", "역명", "사용일자", column]]
+
+max_boarding = get_max_stat(df, "승차총승객수").rename(columns={"승차총승객수": "최대승차수"})
+max_alighting = get_max_stat(df, "하차총승객수").rename(columns={"하차총승객수": "최대하차수"})
+
+# 병합
+max_summary = pd.merge(max_boarding, max_alighting, on="노선명", suffixes=("_승차", "_하차"))
+
+# 결과 출력
+print("\n📋 노선별 최대 승/하차 역 및 날짜:")
+print(max_summary)
